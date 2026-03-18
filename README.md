@@ -112,6 +112,13 @@ bash scripts/status_full_stack.sh
 
 # 健康接口
 curl -sS http://127.0.0.1:3900/api/v1/public/health
+
+# 若出现 "openclaw: command not found"，执行下面修复
+OPENCLAW_BIN="$(npm config get prefix)/bin/openclaw"
+if [[ -x "$OPENCLAW_BIN" ]]; then
+  sudo ln -sf "$OPENCLAW_BIN" /usr/local/bin/openclaw
+  openclaw --version
+fi
 ```
 
 ## 生产部署

@@ -37,6 +37,52 @@ ensure_node_ready() {
   exit 2
 }
 
+link_openclaw_bin() {
+  local src="$1"
+  if command -v sudo >/dev/null 2>&1; then
+    sudo ln -sf "$src" /usr/local/bin/openclaw
+  else
+    ln -sf "$src" /usr/local/bin/openclaw
+  fi
+}
+
+ensure_openclaw_ready() {
+  ensure_node_ready
+
+  if command -v openclaw >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local npm_prefix=""
+  local npm_candidate=""
+  local dist_candidate="/usr/local/${NODE_DIST}/bin/openclaw"
+
+  npm_prefix="$(npm config get prefix 2>/dev/null || true)"
+  if [[ -n "$npm_prefix" && "$npm_prefix" != "undefined" ]]; then
+    npm_candidate="${npm_prefix%/}/bin/openclaw"
+    if [[ -x "$npm_candidate" ]]; then
+      echo "[fix] link openclaw from npm prefix: $npm_candidate"
+      link_openclaw_bin "$npm_candidate"
+    fi
+  fi
+
+  if ! command -v openclaw >/dev/null 2>&1 && [[ -x "$dist_candidate" ]]; then
+    echo "[fix] link openclaw from node dist: $dist_candidate"
+    link_openclaw_bin "$dist_candidate"
+  fi
+
+  hash -r || true
+
+  if command -v openclaw >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "[error] openclaw binary not in PATH after install." >&2
+  echo "[hint] npm prefix: ${npm_prefix:-<empty>}" >&2
+  echo "[hint] try: sudo ln -sf \"$(npm config get prefix)/bin/openclaw\" /usr/local/bin/openclaw" >&2
+  return 1
+}
+
 install_stage() {
   echo "[step] install Node ${NODE_VERSION} and OpenClaw ${OPENCLAW_VERSION}"
 
@@ -58,15 +104,19 @@ install_stage() {
   npm -v
 
   npm i -g "openclaw@${OPENCLAW_VERSION}"
+
+  if ! ensure_openclaw_ready; then
+    exit 3
+  fi
+
   openclaw --version
   echo "[ok] install done"
 }
 
 configure_stage() {
-  ensure_node_ready
-  if ! command -v openclaw >/dev/null 2>&1; then
+  if ! ensure_openclaw_ready; then
     echo "[error] openclaw not found. run install stage first." >&2
-    exit 3
+    exit 4
   fi
   : "${ROUTER_API_KEY:?ROUTER_API_KEY is required for configure stage}"
 
@@ -97,10 +147,9 @@ configure_stage() {
 }
 
 patch_stage() {
-  ensure_node_ready
-  if ! command -v openclaw >/dev/null 2>&1; then
+  if ! ensure_openclaw_ready; then
     echo "[error] openclaw not found. run install stage first." >&2
-    exit 4
+    exit 5
   fi
 
   local npm_root
