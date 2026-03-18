@@ -213,3 +213,5 @@ ops/reports/
 runtime/
 workspace/ecom/.openclaw/
 ops/army/army.env
+
+output/
