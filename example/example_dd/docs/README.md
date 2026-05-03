@@ -23,7 +23,9 @@
    - 查看消息处理、问答、总结、日程、Issue、Wiki 的逻辑
 6. `bot/example/example_dd/docs/kb-and-rag.md`
    - 查看知识库建设策略，以及与 `yeying-rag` 的协作关系
-7. `bot/example/example_dd/docs/roadmap.md`
+7. `bot/example/example_dd/docs/issue-bot-deployment.md`
+   - 面向运维和实施同学，查看 issue 机器人部署、配置、启动和排障步骤
+8. `bot/example/example_dd/docs/roadmap.md`
    - 查看实施顺序、阶段目标和待决问题
 
 ## 文档分工
@@ -34,4 +36,5 @@
 - `architecture.md`：详细技术结构与当前主实现
 - `workflows.md`：详细处理逻辑
 - `kb-and-rag.md`：知识库与中台策略
+- `issue-bot-deployment.md`：Issue 机器人部署、配置、验证与常见问题
 - `roadmap.md`：落地计划与实施顺序
