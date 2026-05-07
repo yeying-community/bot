@@ -5,6 +5,7 @@ import fs from "node:fs";
 
 import { base64UrlEncode } from "./common.mjs";
 
+// env 文件只需读取一次，避免多工具串行调用时反复触盘。
 let cachedConfigEnv = null;
 
 function loadGitHubAppConfigEnv() {
@@ -16,6 +17,7 @@ function loadGitHubAppConfigEnv() {
   const parsed = {};
 
   if (fs.existsSync(envFile)) {
+    // 这里只实现足够用的 KEY=VALUE 解析，兼容简单引号包裹。
     for (const rawLine of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
       const line = rawLine.trim();
       if (!line || line.startsWith("#")) {
@@ -41,6 +43,7 @@ function loadGitHubAppConfigEnv() {
     parsed.GITHUB_APP_PRIVATE_KEY_PATH = parsed.GITHUB_APP_PRIVATE_KEY;
   }
 
+  // 兼容旧变量名，统一折叠到默认 owner/repo/installation id。
   if (!parsed.GITHUB_DEFAULT_OWNER && parsed.GITHUB_OWNER) {
     parsed.GITHUB_DEFAULT_OWNER = parsed.GITHUB_OWNER;
   }
@@ -56,6 +59,7 @@ function loadGitHubAppConfigEnv() {
 }
 
 function readPrivateKey({ privateKey, privateKeyPath }) {
+  // 支持直接传 PEM 文本，也支持传文件路径；路径优先级更高。
   const normalizedPath =
     privateKeyPath ||
     (privateKey && !String(privateKey).includes("BEGIN") && fs.existsSync(String(privateKey))
@@ -72,6 +76,7 @@ function readPrivateKey({ privateKey, privateKeyPath }) {
 }
 
 function createAppJwt({ appId, privateKeyPem }) {
+  // GitHub App JWT 最长 10 分钟，这里留一点时钟漂移余量。
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
@@ -86,6 +91,7 @@ function createAppJwt({ appId, privateKeyPem }) {
 }
 
 async function githubApiJson(url, { method = "GET", token, body, accept = "application/vnd.github+json" } = {}) {
+  // 统一做 header、响应解析和错误封装，避免每个工具重复样板代码。
   const response = await fetch(url, {
     method,
     headers: {
@@ -116,6 +122,7 @@ async function githubApiJson(url, { method = "GET", token, body, accept = "appli
 }
 
 export async function resolveInstallationId({ jwt, installationId, owner, repo }) {
+  // 已显式提供 installation id 时直接复用，否则再按 repo 反查。
   if (installationId) {
     return {
       installationId: String(installationId),
@@ -145,6 +152,7 @@ export async function createInstallationAccessToken({
   owner,
   repo
 }) {
+  // 流程是：私钥 -> App JWT -> installation id -> installation access token。
   const privateKeyPem = readPrivateKey({ privateKey, privateKeyPath });
   const jwt = createAppJwt({ appId, privateKeyPem });
   const resolved = await resolveInstallationId({ jwt, installationId, owner, repo });
@@ -168,6 +176,7 @@ export async function createInstallationAccessToken({
 
 export async function resolveGitHubToken({ owner, repo }) {
   const configEnv = loadGitHubAppConfigEnv();
+  // 优先使用直接 token，只有没有 token 时才走 GitHub App 交换流程。
   const directToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || configEnv.GITHUB_TOKEN || configEnv.GH_TOKEN;
   if (directToken) {
     return {

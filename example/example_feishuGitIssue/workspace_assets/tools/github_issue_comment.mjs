@@ -4,6 +4,7 @@ import { parseArgs, printJson, required } from "./lib/common.mjs";
 import { resolveGitHubToken } from "./lib/github_app.mjs";
 
 function parseIssueUrl(issueUrl) {
+  // 允许用户直接贴 issue 链接，减少 owner/repo/number 三段手填。
   const match = String(issueUrl || "").trim().match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)(?:[/?#].*)?$/i);
   if (!match) {
     return null;
@@ -16,6 +17,7 @@ function parseIssueUrl(issueUrl) {
 }
 
 function parseIssueNumber(args, fromUrl) {
+  // issueNumber 支持来自显式参数、别名 number 或 issueUrl。
   const raw = args.issueNumber || args.number || fromUrl?.issueNumber;
   const issueNumber = Number(required("issueNumber", raw));
   if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
@@ -26,6 +28,7 @@ function parseIssueNumber(args, fromUrl) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  // 默认 preview，配合确认桥先展示再执行。
   const execute = args.execute === "true";
   const fromUrl = args.issueUrl ? parseIssueUrl(args.issueUrl) : null;
   if (args.issueUrl && !fromUrl) {
@@ -63,6 +66,7 @@ async function main() {
     return;
   }
 
+  // comment 和 create 共用同一套 GitHub 认证解析逻辑。
   const auth = await resolveGitHubToken({ owner, repo });
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
     method: "POST",
@@ -107,6 +111,7 @@ async function main() {
     authMode: auth.mode,
     ...(auth.installationId ? { installationId: auth.installationId } : {}),
     ...(auth.expiresAt ? { tokenExpiresAt: auth.expiresAt } : {}),
+    // 返回 comment URL 和对应 issue URL，方便上层提示消息复用。
     result: {
       id: parsed.id,
       htmlUrl: parsed.html_url,

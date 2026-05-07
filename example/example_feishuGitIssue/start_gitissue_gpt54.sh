@@ -3,6 +3,7 @@ set -euo pipefail
 
 BASE_DIR="/root/code/bot/example/example_feishuGitIssue"
 INSTANCE_DIR="$BASE_DIR/.openclaw-feishu-gitissue-gpt54"
+# 这组路径把当前示例实例和它的状态、日志、配置固定到同一个目录。
 CONFIG_PATH="$INSTANCE_DIR/openclaw.json"
 STATE_DIR="$INSTANCE_DIR/state"
 LOG_PATH="$INSTANCE_DIR/gateway.out"
@@ -11,6 +12,7 @@ PORT=18890
 START_TIMEOUT_SEC=90
 GITHUB_ENV_FILE="${GITHUB_ENV_FILE:-/root/.config/openclaw/github-app/config.env}"
 
+# 优先使用显式指定的 openclaw，可执行文件不存在时再回退到常见安装位置。
 detect_openclaw_bin() {
   if [[ -n "${OPENCLAW_BIN:-}" && -x "$OPENCLAW_BIN" ]]; then
     echo "$OPENCLAW_BIN"
@@ -25,6 +27,7 @@ detect_openclaw_bin() {
   return 1
 }
 
+# 读取 GitHub App 环境变量，并把旧式私钥路径写法归一化到 *_PATH。
 load_github_env() {
   if [[ -f "$GITHUB_ENV_FILE" ]]; then
     set -a
@@ -38,6 +41,7 @@ load_github_env() {
   fi
 }
 
+# 只认和当前 config 路径绑定的 openclaw 进程，避免误杀别的实例。
 find_running_pids() {
   for p in $(pgrep -x openclaw 2>/dev/null || true); do
     if [[ -r "/proc/$p/environ" ]] && tr '\0' '\n' < "/proc/$p/environ" | grep -q "^OPENCLAW_CONFIG_PATH=$CONFIG_PATH$"; then
@@ -46,6 +50,7 @@ find_running_pids() {
   done
 }
 
+# 端口监听就绪，才算 gateway 真正可用。
 is_port_ready() {
   ss -lntp 2>/dev/null | grep -qE "127.0.0.1:$PORT|\[::1\]:$PORT"
 }
@@ -62,12 +67,14 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   exit 1
 fi
 
+# 如果发现同配置实例已经在跑，直接复用。
 pids="$(find_running_pids || true)"
 if [[ -n "$pids" ]] && is_port_ready; then
   echo "already running: pids=$pids"
   exit 0
 fi
 
+# 先停掉残留实例，再重新拉起，避免旧进程占着端口或状态。
 if [[ -n "$pids" ]]; then
   for p in $pids; do
     kill "$p" 2>/dev/null || true
@@ -77,11 +84,13 @@ fi
 
 load_github_env
 mkdir -p "$STATE_DIR"
+# 后台启动 gateway，把输出追加到日志里，便于后续排障。
 nohup env OPENCLAW_CONFIG_PATH="$CONFIG_PATH" OPENCLAW_STATE_DIR="$STATE_DIR" \
   "$OPENCLAW_BIN" gateway run --port "$PORT" >> "$LOG_PATH" 2>&1 &
 
 echo $! > "$PID_FILE"
 
+# 启动后轮询一段时间，直到进程和端口都真正 ready。
 elapsed=0
 while [[ "$elapsed" -lt "$START_TIMEOUT_SEC" ]]; do
   sleep 2

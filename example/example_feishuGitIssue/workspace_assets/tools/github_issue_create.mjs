@@ -5,6 +5,7 @@ import { resolveGitHubToken } from "./lib/github_app.mjs";
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  // 默认走 preview，只有显式 execute=true 才真的调 GitHub API。
   const execute = args.execute === "true";
   const owner = args.owner || process.env.GITHUB_DEFAULT_OWNER || process.env.GITHUB_OWNER;
   const repo = args.repo || process.env.GITHUB_DEFAULT_REPO || process.env.GITHUB_REPO;
@@ -31,6 +32,7 @@ async function main() {
   }
 
   if (!execute) {
+    // preview 模式只回显将要提交的 payload，供确认环节展示。
     printJson({
       ok: true,
       mode: "preview",
@@ -41,6 +43,7 @@ async function main() {
     return;
   }
 
+  // 真正执行时才解析认证信息，避免 preview 因认证缺失而失败。
   const auth = await resolveGitHubToken({ owner, repo });
   const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
     method: "POST",
@@ -58,6 +61,7 @@ async function main() {
   try {
     parsed = JSON.parse(raw);
   } catch {
+    // GitHub 偶尔会返回非 JSON 内容，保留 raw 便于排障。
     parsed = { raw };
   }
 
@@ -83,6 +87,7 @@ async function main() {
     authMode: auth.mode,
     ...(auth.installationId ? { installationId: auth.installationId } : {}),
     ...(auth.expiresAt ? { tokenExpiresAt: auth.expiresAt } : {}),
+    // 只返回确认消息需要的字段，避免把整份 GitHub 响应扩散出去。
     result: {
       number: parsed.number,
       title: parsed.title,

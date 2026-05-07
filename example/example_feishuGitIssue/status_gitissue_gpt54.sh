@@ -3,12 +3,14 @@ set -euo pipefail
 
 BASE_DIR="/root/code/bot/example/example_feishuGitIssue"
 INSTANCE_DIR="$BASE_DIR/.openclaw-feishu-gitissue-gpt54"
+# 这些路径和启动脚本保持一致，便于交叉检查进程、日志和配置。
 CONFIG_PATH="$INSTANCE_DIR/openclaw.json"
 STATE_DIR="$INSTANCE_DIR/state"
 LOG_PATH="$INSTANCE_DIR/gateway.out"
 PORT=18890
 GITHUB_ENV_FILE="${GITHUB_ENV_FILE:-/root/.config/openclaw/github-app/config.env}"
 
+# 读取 GitHub App 环境，方便直接打印当前生效的认证来源。
 detect_openclaw_bin() {
   if [[ -n "${OPENCLAW_BIN:-}" && -x "$OPENCLAW_BIN" ]]; then
     echo "$OPENCLAW_BIN"
@@ -23,6 +25,7 @@ detect_openclaw_bin() {
   return 1
 }
 
+# 只读取不执行：把本次实例的配置和运行状态汇总到终端。
 load_github_env() {
   if [[ -f "$GITHUB_ENV_FILE" ]]; then
     set -a
@@ -49,6 +52,7 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   exit 1
 fi
 
+# 按 config 路径筛选进程，避免把其他 openclaw 实例混进来。
 echo "== process (by config path) =="
 found=0
 for p in $(pgrep -x openclaw 2>/dev/null || true); do
@@ -62,9 +66,11 @@ if [[ "$found" -eq 0 ]]; then
   echo "openclaw not running"
 fi
 
+# 端口检查补充进程视图，方便判断是没起、起错还是端口冲突。
 echo "== port =="
 ss -lntp | grep -E "127.0.0.1:$PORT|\[::1\]:$PORT" || true
 
+# 打印 GitHub App 相关环境，确认最终是 token 还是 app auth 在生效。
 echo "== github app env =="
 echo "github_env_file=$GITHUB_ENV_FILE"
 echo "GITHUB_APP_ID=${GITHUB_APP_ID:-<unset>}"
@@ -74,9 +80,11 @@ echo "GITHUB_DEFAULT_REPO=${GITHUB_DEFAULT_REPO:-${GITHUB_REPO:-<unset>}}"
 echo "GITHUB_APP_PRIVATE_KEY_PATH=${GITHUB_APP_PRIVATE_KEY_PATH:-<unset>}"
 
 if [[ -n "$OPENCLAW_BIN" ]]; then
+# hooks list 用来确认本实例实际加载到了哪些 hook。
   echo "== hooks =="
   OPENCLAW_CONFIG_PATH="$CONFIG_PATH" OPENCLAW_STATE_DIR="$STATE_DIR" "$OPENCLAW_BIN" hooks list 2>/dev/null || true
 fi
 
+# 最近日志通常能直接定位启动失败原因。
 echo "== recent log =="
 tail -n 120 "$LOG_PATH" 2>/dev/null || true

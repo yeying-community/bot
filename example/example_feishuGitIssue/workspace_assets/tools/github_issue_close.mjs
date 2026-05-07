@@ -3,6 +3,7 @@
 import { parseArgs, printJson, required } from "./lib/common.mjs";
 import { resolveGitHubToken } from "./lib/github_app.mjs";
 
+// GitHub 目前只接受这两个 issue 关闭原因。
 const ALLOWED_REASONS = new Set(["completed", "not_planned"]);
 
 function parseIssueNumber(args) {
@@ -16,6 +17,7 @@ function parseIssueNumber(args) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  // close 动作也先支持 preview，避免聊天里直接落外部副作用。
   const execute = args.execute === "true";
   const owner = args.owner || process.env.GITHUB_DEFAULT_OWNER || process.env.GITHUB_OWNER;
   const repo = args.repo || process.env.GITHUB_DEFAULT_REPO || process.env.GITHUB_REPO;
@@ -26,6 +28,7 @@ async function main() {
     throw new Error(`Unsupported close reason: ${reason}. Use one of: ${Array.from(ALLOWED_REASONS).join(", ")}.`);
   }
 
+  // preview 阶段把最终 PATCH 意图结构化回显给确认流程。
   const payload = {
     issueNumber,
     state: "closed",
@@ -100,6 +103,7 @@ async function main() {
     authMode: auth.mode,
     ...(auth.installationId ? { installationId: auth.installationId } : {}),
     ...(auth.expiresAt ? { tokenExpiresAt: auth.expiresAt } : {}),
+    // 成功后返回足够展示关闭结果的最小字段集合。
     result: {
       number: parsed.number,
       title: parsed.title,

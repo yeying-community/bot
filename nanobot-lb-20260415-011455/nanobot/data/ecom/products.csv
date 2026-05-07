@@ -1,0 +1,4 @@
+sku,name,moq,lead_time_days,price_tier_usd,cert,shipping_terms,updated_at
+TOY-001,Magnetic Blocks 64pcs,200,15,"200-499:4.20|500-999:3.85|1000+:3.55","CE;EN71","FOB Shenzhen",2026-03-06
+TOY-002,RC Car Basic,100,20,"100-299:8.90|300-799:8.10|800+:7.40","CE;EN71;RoHS","FOB Shenzhen",2026-03-06
+TOY-003,Plush Bear 30cm,300,18,"300-799:5.10|800-1999:4.60|2000+:4.20","CE;EN71","FOB Shenzhen",2026-03-06

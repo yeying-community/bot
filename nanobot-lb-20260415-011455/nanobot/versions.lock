@@ -1,0 +1,9 @@
+# Locked versions for reproducible setup
+NODE_VERSION=22.22.0
+NODE_DIST=node-v22.22.0-linux-x64
+OPENCLAW_VERSION=2026.2.26
+ROUTER_MODEL=gpt-5.3-codex
+ROUTER_BASE_URL=https://test-router.yeying.pub/v1
+WHATSAPP_BROWSER_NAME=Ubuntu
+WHATSAPP_BROWSER_CLIENT=Chrome
+WHATSAPP_BROWSER_VERSION=122.0.0.0

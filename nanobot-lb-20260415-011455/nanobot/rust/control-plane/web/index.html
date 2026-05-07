@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bot Hub</title>
+  <style>
+    :root {
+      --bg: #f2f6fb;
+      --card: #fff;
+      --line: #dbe4f0;
+      --txt: #0f172a;
+      --sub: #64748b;
+      --pri: #0b66ff;
+      --ok: #0f9d58;
+      --warn: #f59e0b;
+      --err: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--txt); font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 18px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(15,23,42,.05); }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .between { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .logo { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg,#0058ff,#00a6ff); color:#fff; display:grid; place-items:center; font-weight:800; }
+    h1,h2,h3 { margin: 0; }
+    p { margin: 6px 0 0; color: var(--sub); }
+    input, select, button { border-radius: 10px; border: 1px solid var(--line); padding: 9px 10px; min-height: 38px; font-size: 14px; }
+    input, select { width: 100%; max-width: 100%; }
+    button { background: linear-gradient(135deg,#0b66ff,#0095ff); color: #fff; border: none; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #eef2f7; color: #1f2937; border: 1px solid var(--line); }
+    button.warn { background: #f59e0b; }
+    button.stop { background: #ef4444; }
+    button.loading { position: relative; pointer-events: none; color: transparent !important; }
+    button.loading::after {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      animation: spin .75s linear infinite;
+    }
+    button.secondary.loading::after { border-color: rgba(15,23,42,.25); border-top-color: #0f172a; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid2 > * { min-width: 0; }
+    .hidden { display: none !important; }
+    .muted { color: var(--sub); font-size: 13px; }
+    .tag { display:inline-block; background:#eef6ff; color:#0b66ff; border:1px solid #cfe4ff; border-radius:999px; padding:2px 9px; font-size:12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 6px; text-align: left; vertical-align: top; }
+    th { background: #f8fbff; }
+    .status-running { color: var(--ok); font-weight: 700; }
+    .status-error { color: var(--err); font-weight: 700; }
+    .status-other { color: var(--warn); font-weight: 700; }
+    pre { margin: 0; min-height: 220px; max-width: 100%; background:#0b1220; color:#d1d5db; border:1px solid #1f2937; border-radius:10px; padding:12px; overflow:auto; font-family: "Cascadia Mono", "Consolas", "Courier New", monospace; }
+    #logs { min-height: 260px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+    #pairQr { min-height: 320px; background:#ffffff; color:#000000; border:1px solid #cbd5e1; font-size:10px; line-height:1; white-space:pre; }
+    .tag.pair-linked { background:#ecfdf3; color:#0f9d58; border-color:#b7ebca; }
+    .tag.pair-qr-ready { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .tag.pair-waiting { background:#fffbeb; color:#b45309; border-color:#fde68a; }
+    .tag.pair-qr-timeout, .tag.pair-failed { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+    .tag.pair-idle { background:#f1f5f9; color:#475569; border-color:#cbd5e1; }
+    #toast { position: fixed; right: 16px; bottom: 16px; background: #111827; color: #fff; padding: 10px 14px; border-radius: 9px; opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } .wrap { padding: 10px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="loginView" class="card">
+      <div class="row">
+        <div class="logo">BH</div>
+        <div>
+          <h1>Bot Hub 控制台</h1>
+          <p>钱包登录后，创建并独立管理多个 WhatsApp / 钉钉机器人实例</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <div class="between">
+          <div class="muted">先连接钱包才能进入控制台。若钱包支持 UCAN 扩展方法将自动绑定。</div>
+          <button id="btnLogin">连接钱包并登录</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="muted" style="margin-bottom:8px;">历史钱包</div>
+        <div id="historyWallets" class="row"></div>
+      </div>
+    </div>
+
+    <div id="appView" class="hidden">
+      <div class="card between">
+        <div class="row">
+          <div class="logo">BH</div>
+          <div>
+            <h2>Bot Hub 控制台</h2>
+            <p>统一配置模型，独立启动实例，互不影响</p>
+          </div>
+        </div>
+        <div class="row">
+          <span class="tag">Wallet: <span id="walletShort">-</span></span>
+          <span class="tag">Expire: <span id="walletExpire">-</span></span>
+          <button class="secondary" id="btnCopyWallet">复制地址</button>
+          <button class="secondary" id="btnLogout">退出</button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3 style="margin-bottom:8px;">创建实例</h3>
+          <div class="grid2">
+            <div>
+              <div class="muted">名称</div>
+              <input id="fName" placeholder="wa-ecom-fr-01" />
+            </div>
+            <div>
+              <div class="muted">类型</div>
+              <select id="fKind">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="dingtalk">DingTalk</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">模板</div>
+              <select id="fTemplate">
+                <option value="ecommerce-toy">ecommerce-toy（跨境玩具卖家）</option>
+                <option value="generic">generic（通用）</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">渠道</div>
+              <select id="fProviderCreate">
+                <option value="router">Router</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">供应商</div>
+              <select id="fSupplierCreate">
+                <option value="">全部</option>
+                <option value="openai">OpenAI</option>
+                <option value="baidu">Baidu</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="google">Google</option>
+                <option value="tencenthunyuan">TencentHunyuan</option>
+                <option value="minimax">MiniMax</option>
+                <option value="xai">xAI</option>
+                <option value="qwen">Qwen</option>
+                <option value="mistral">Mistral</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">模型</div>
+              <select id="fModel">
+                <option value="gpt-5.3-codex">gpt-5.3-codex</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">DingTalk Client ID（仅钉钉）</div>
+              <input id="fDdId" placeholder="可留空（非钉钉）" />
+            </div>
+            <div>
+              <div class="muted">DingTalk Client Secret（仅钉钉）</div>
+              <input id="fDdSecret" placeholder="可留空（非钉钉）" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <button id="btnCreate">创建</button>
+            <button class="secondary" id="btnRefresh">刷新</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:8px;">全局模型（Admin）</h3>
+          <div class="grid2">
+            <div>
+              <div class="muted">渠道</div>
+              <select id="fProviderGlobal">
+                <option value="router">Router</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">供应商</div>
+              <select id="fSupplierGlobal">
+                <option value="">全部</option>
+                <option value="openai">OpenAI</option>
+                <option value="baidu">Baidu</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="google">Google</option>
+                <option value="tencenthunyuan">TencentHunyuan</option>
+                <option value="minimax">MiniMax</option>
+                <option value="xai">xAI</option>
+                <option value="qwen">Qwen</option>
+                <option value="mistral">Mistral</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">默认模型</div>
+              <select id="fGlobalModel">
+                <option value="gpt-5.3-codex">gpt-5.3-codex</option>
+              </select>
+            </div>
+            <div>
+              <div class="muted">Admin Token</div>
+              <input id="fAdminToken" placeholder="x-admin-token" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <button id="btnSetGlobalModel">更新全局模型</button>
+            <button class="secondary" id="btnLoadModels">刷新模型列表</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="between">
+          <h3>实例列表</h3>
+          <div class="muted">点击按钮可启动/停止/配对/查看日志/删除</div>
+        </div>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>类型</th>
+                <th>模型</th>
+                <th>端口</th>
+                <th>状态</th>
+                <th>动作</th>
+              </tr>
+            </thead>
+            <tbody id="instancesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="between">
+          <h3>日志与配对</h3>
+          <div id="logTitle" class="muted">未选择实例</div>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <div class="between" style="margin-bottom:8px;">
+              <div class="muted">WhatsApp 配对二维码（白底黑字可扫码）</div>
+              <span id="pairStatus" class="tag pair-idle">未配对</span>
+            </div>
+            <pre id="pairQr">暂无可扫码二维码。请先点击实例“配对”。</pre>
+            <div id="pairHint" class="muted" style="margin-top:8px;">点击“配对”后，二维码会在这里实时刷新。</div>
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:8px;">运行日志</div>
+            <pre id="logs">暂无日志</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+const state = {
+  me: null,
+  items: [],
+  refreshTimer: null,
+  authTimer: null,
+  currentLogInstanceId: null,
+  logTimer: null,
+  defaultModel: '',
+  modelCatalog: { router: ['gpt-5.3-codex'] },
+};
+
+function toast(msg, ms = 2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function setButtonLoading(btn, loading) {
+  if (!btn) return;
+  btn.disabled = !!loading;
+  btn.classList.toggle('loading', !!loading);
+}
+
+function shortWallet(v) {
+  if (!v) return '-';
+  if (v.length <= 12) return v;
+  return v.slice(0, 6) + '...' + v.slice(-4);
+}
+
+function pairStatusText(status) {
+  if (status === 'linked') return '已连接';
+  if (status === 'qr_ready') return '可扫码';
+  if (status === 'waiting') return '等待连接';
+  if (status === 'qr_timeout') return '二维码超时';
+  if (status === 'failed') return '配对失败';
+  return '未配对';
+}
+
+function pairStatusClass(status) {
+  if (status === 'linked') return 'pair-linked';
+  if (status === 'qr_ready') return 'pair-qr-ready';
+  if (status === 'waiting') return 'pair-waiting';
+  if (status === 'qr_timeout') return 'pair-qr-timeout';
+  if (status === 'failed') return 'pair-failed';
+  return 'pair-idle';
+}
+
+function resetLogPanel() {
+  state.currentLogInstanceId = null;
+  if (state.logTimer) {
+    clearInterval(state.logTimer);
+    state.logTimer = null;
+  }
+  document.getElementById('logTitle').textContent = '未选择实例';
+  document.getElementById('logs').textContent = '暂无日志';
+  document.getElementById('pairQr').textContent = '暂无可扫码二维码。请先点击实例“配对”。';
+  document.getElementById('pairHint').textContent = '点击“配对”后，二维码会在这里实时刷新。';
+  const pairStatusEl = document.getElementById('pairStatus');
+  pairStatusEl.textContent = pairStatusText('idle');
+  pairStatusEl.className = `tag ${pairStatusClass('idle')}`;
+}
+
+function extractModelIds(input) {
+  const ids = new Set();
+
+  function pushId(v) {
+    if (typeof v === 'string' && v.trim()) ids.add(v.trim());
+  }
+
+  if (Array.isArray(input)) {
+    input.forEach(x => pushId(x?.id || x?.name || x));
+  } else if (Array.isArray(input?.data)) {
+    input.data.forEach(x => pushId(x?.id || x?.name || x));
+  } else if (Array.isArray(input?.models)) {
+    input.models.forEach(x => pushId(x?.id || x?.name || x));
+  }
+
+  if (!ids.size) ids.add('gpt-5.3-codex');
+  return Array.from(ids).sort();
+}
+
+function setSelectOptions(selectId, values) {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+  const current = el.value;
+  el.innerHTML = '';
+  values.forEach(v => {
+    const op = document.createElement('option');
+    op.value = v;
+    op.textContent = v;
+    el.appendChild(op);
+  });
+  if (values.includes(current)) {
+    el.value = current;
+  }
+}
+
+function setSelectValueWithFallback(selectId, value) {
+  const el = document.getElementById(selectId);
+  if (!el || !value) return;
+  if (![...el.options].some(op => op.value === value)) {
+    const op = document.createElement('option');
+    op.value = value;
+    op.textContent = value;
+    el.appendChild(op);
+  }
+  el.value = value;
+}
+
+function detectSupplierByModelId(modelId) {
+  const id = (modelId || '').toLowerCase();
+  if (!id) return '';
+  if (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4') || id.includes('openai')) return 'openai';
+  if (id.includes('ernie') || id.includes('wenxin') || id.includes('baidu')) return 'baidu';
+  if (id.startsWith('claude') || id.includes('anthropic')) return 'anthropic';
+  if (id.includes('deepseek')) return 'deepseek';
+  if (id.startsWith('gemini') || id.includes('google')) return 'google';
+  if (id.includes('hunyuan') || id.includes('tencent')) return 'tencenthunyuan';
+  if (id.includes('minimax') || id.includes('abab')) return 'minimax';
+  if (id.startsWith('grok') || id.includes('xai')) return 'xai';
+  if (id.startsWith('qwen') || id.includes('tongyi')) return 'qwen';
+  if (id.startsWith('mistral') || id.includes('mixtral')) return 'mistral';
+  return '';
+}
+
+function filterModelsBySupplier(allModels, supplier) {
+  if (!supplier) return allModels;
+  return allModels.filter(id => detectSupplierByModelId(id) === supplier);
+}
+
+function applyModelFilters() {
+  const all = (state.modelCatalog.router && state.modelCatalog.router.length)
+    ? [...state.modelCatalog.router]
+    : ['gpt-5.3-codex'];
+
+  const createSupplier = document.getElementById('fSupplierCreate')?.value || '';
+  const globalSupplier = document.getElementById('fSupplierGlobal')?.value || '';
+
+  const createModels = filterModelsBySupplier(all, createSupplier);
+  const globalModels = filterModelsBySupplier(all, globalSupplier);
+
+  const createFinal = createModels.length ? createModels : ['gpt-5.3-codex'];
+  const globalFinal = globalModels.length ? globalModels : ['gpt-5.3-codex'];
+
+  setSelectOptions('fModel', createFinal);
+  setSelectOptions('fGlobalModel', globalFinal);
+
+  if (state.defaultModel && globalFinal.includes(state.defaultModel)) {
+    document.getElementById('fGlobalModel').value = state.defaultModel;
+  }
+  if (state.defaultModel && createFinal.includes(state.defaultModel)) {
+    document.getElementById('fModel').value = state.defaultModel;
+  }
+}
+
+
+async function api(path, options = {}) {
+  const opts = { credentials: 'include', ...options };
+  const resp = await fetch(path, opts);
+  const text = await resp.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch (_) {}
+
+  if (!resp.ok) {
+    const msg = data && data.error ? data.error : (`HTTP ${resp.status}`);
+    throw new Error(msg);
+  }
+  if (data && data.ok === false) throw new Error(data.error || 'request failed');
+  return data ? data.data : null;
+}
+
+function saveWalletHistory(wallet) {
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem('bot_hub_wallets') || '[]'); } catch (_) {}
+  arr = [wallet, ...arr.filter(x => x !== wallet)].slice(0, 6);
+  localStorage.setItem('bot_hub_wallets', JSON.stringify(arr));
+  renderWalletHistory();
+}
+
+function renderWalletHistory() {
+  const root = document.getElementById('historyWallets');
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem('bot_hub_wallets') || '[]'); } catch (_) {}
+  root.innerHTML = '';
+  if (!arr.length) {
+    root.innerHTML = '<span class="muted">暂无历史钱包</span>';
+    return;
+  }
+  arr.forEach(w => {
+    const b = document.createElement('button');
+    b.className = 'secondary';
+    b.textContent = shortWallet(w);
+    b.title = w;
+    b.onclick = () => document.getElementById('btnLogin').click();
+    root.appendChild(b);
+  });
+}
+
+async function walletLogin() {
+  if (!window.ethereum) {
+    throw new Error('未检测到钱包扩展');
+  }
+
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const wallet = accounts && accounts[0];
+  if (!wallet) throw new Error('钱包未返回账户');
+
+  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+
+  let ucanSession = null;
+  let ucanSignature = null;
+
+  try {
+    ucanSession = await window.ethereum.request({
+      method: 'yeying_ucan_session',
+      params: [{ audience: location.origin, ttl: 86400 }],
+    });
+  } catch (_) {}
+
+  if (ucanSession) {
+    try {
+      ucanSignature = await window.ethereum.request({
+        method: 'yeying_ucan_sign',
+        params: [{ signingInput: JSON.stringify({ aud: location.origin, ts: Date.now() }) }],
+      });
+    } catch (_) {}
+  }
+
+  await api('/api/v1/public/auth/wallet/connect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      wallet_id: wallet,
+      chain_id: chainId,
+      ucan_session: ucanSession,
+      ucan_signature: ucanSignature,
+    }),
+  });
+
+  saveWalletHistory(wallet);
+  toast('钱包登录成功');
+}
+
+async function checkAuth() {
+  try {
+    const me = await api('/api/v1/public/auth/me');
+    state.me = me;
+    document.getElementById('walletShort').textContent = shortWallet(me.wallet_id);
+    document.getElementById('walletExpire').textContent = me.expires_at;
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('appView').classList.remove('hidden');
+    return true;
+  } catch (_) {
+    state.me = null;
+    resetLogPanel();
+    document.getElementById('appView').classList.add('hidden');
+    document.getElementById('loginView').classList.remove('hidden');
+    return false;
+  }
+}
+
+async function loadInstances() {
+  const data = await api('/api/v1/public/bot/instances');
+  state.items = data.items || [];
+  state.defaultModel = data.defaultModel || '';
+  applyModelFilters();
+  renderInstances();
+}
+
+function renderInstances() {
+  const body = document.getElementById('instancesBody');
+  body.innerHTML = '';
+
+  if (!state.items.length) {
+    body.innerHTML = '<tr><td colspan="6" class="muted">暂无实例</td></tr>';
+    return;
+  }
+
+  state.items.forEach(inst => {
+    const tr = document.createElement('tr');
+    const sClass = inst.status === 'running' ? 'status-running' : (inst.status === 'error' ? 'status-error' : 'status-other');
+
+    tr.innerHTML = `
+      <td>${inst.id}<br/><span class="muted">${inst.name || '-'}</span></td>
+      <td>${inst.kind}</td>
+      <td>
+        <input id="model_${inst.id}" value="${inst.model}" style="width:150px;" />
+        <button class="secondary" data-act="set-model" data-id="${inst.id}">改</button>
+      </td>
+      <td>${inst.port}</td>
+      <td><span class="${sClass}">${inst.status}</span><br/><span class="muted">pid: ${inst.pid || '-'}</span></td>
+      <td>
+        <div class="row">
+          <button data-act="start" data-id="${inst.id}">启动</button>
+          <button class="stop" data-act="stop" data-id="${inst.id}">停止</button>
+          <button class="secondary" data-act="logs" data-id="${inst.id}">日志</button>
+          <button class="secondary" data-act="delete" data-id="${inst.id}">删除</button>
+          ${inst.kind === 'whatsapp' ? `<button class="warn" data-act="pair" data-id="${inst.id}">配对</button>` : ''}
+        </div>
+      </td>
+    `;
+
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.onclick = async () => {
+      const act = btn.dataset.act;
+      const id = btn.dataset.id;
+      setButtonLoading(btn, true);
+      try {
+        if (act === 'start') {
+          await api('/api/v1/public/bot/instances/' + id + '/start', { method: 'POST' });
+          toast(`实例 ${id} 已启动`);
+          await loadInstances();
+        }
+        if (act === 'stop') {
+          await api('/api/v1/public/bot/instances/' + id + '/stop', { method: 'POST' });
+          toast(`实例 ${id} 已停止`);
+          await loadInstances();
+        }
+        if (act === 'pair') {
+          await api('/api/v1/public/bot/instances/' + id + '/pair-whatsapp', { method: 'POST' });
+          toast(`实例 ${id} 已触发配对`);
+          await viewLogs(id);
+        }
+        if (act === 'logs') {
+          await viewLogs(id);
+        }
+        if (act === 'delete') {
+          const confirmId = window.prompt(`输入实例ID确认删除：${id}`);
+          if (confirmId !== id) {
+            toast('删除已取消');
+            return;
+          }
+          await api('/api/v1/public/bot/instances/' + id, { method: 'DELETE' });
+          if (state.currentLogInstanceId === id) {
+            resetLogPanel();
+          }
+          toast(`实例 ${id} 已删除`);
+          await loadInstances();
+        }
+        if (act === 'set-model') {
+          const model = document.getElementById(`model_${id}`).value.trim();
+          await api(`/api/v1/public/bot/instances/${id}/model`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model }),
+          });
+          toast(`实例 ${id} 模型已更新`);
+          await loadInstances();
+        }
+      } catch (e) {
+        toast(`操作失败: ${e.message}`, 2800);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    };
+  });
+}
+
+async function viewLogs(id, silent = false) {
+  const data = await api(`/api/v1/public/bot/instances/${id}/logs?lines=260`);
+  state.currentLogInstanceId = id;
+
+  document.getElementById('logTitle').textContent = `实例 ${id}`;
+  document.getElementById('logs').textContent =
+    `===== gateway.log =====\n${data.gateway_log || ''}\n\n===== pair.log =====\n${data.pair_log || ''}`;
+
+  const pairStatus = data.pair_status || 'idle';
+  const pairStatusEl = document.getElementById('pairStatus');
+  pairStatusEl.textContent = pairStatusText(pairStatus);
+  pairStatusEl.className = `tag ${pairStatusClass(pairStatus)}`;
+
+  document.getElementById('pairQr').textContent =
+    (data.pair_qr_ascii && data.pair_qr_ascii.trim())
+      ? data.pair_qr_ascii
+      : '暂无可扫码二维码。请点击“配对”重新生成。';
+
+  document.getElementById('pairHint').textContent =
+    data.pair_hint || '点击“配对”后，二维码会在这里实时刷新。';
+
+  if (!silent) {
+    if (state.logTimer) {
+      clearInterval(state.logTimer);
+    }
+    state.logTimer = setInterval(() => {
+      if (state.currentLogInstanceId !== id) return;
+      viewLogs(id, true).catch(() => {});
+    }, 4000);
+  }
+}
+
+function syncTemplateByKind(force = false) {
+  const kindEl = document.getElementById('fKind');
+  const templateEl = document.getElementById('fTemplate');
+  if (!kindEl || !templateEl) return;
+
+  if (kindEl.value === 'whatsapp') {
+    if (force || !templateEl.value || templateEl.value === 'generic') {
+      templateEl.value = 'ecommerce-toy';
+    }
+    return;
+  }
+
+  if (force || templateEl.value === 'ecommerce-toy') {
+    templateEl.value = 'generic';
+  }
+}
+
+async function createInstance() {
+  const payload = {
+    kind: document.getElementById('fKind').value,
+    name: document.getElementById('fName').value.trim(),
+    model: document.getElementById('fModel').value || null,
+    template: document.getElementById('fTemplate').value || null,
+    dingtalk_client_id: document.getElementById('fDdId').value.trim() || null,
+    dingtalk_client_secret: document.getElementById('fDdSecret').value.trim() || null,
+  };
+
+  if (!payload.name) throw new Error('名称必填');
+
+  await api('/api/v1/public/bot/instances', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  toast('实例创建成功');
+  await loadInstances();
+}
+
+async function setGlobalModel() {
+  const model = document.getElementById('fGlobalModel').value;
+  const token = document.getElementById('fAdminToken').value.trim();
+  if (!model) throw new Error('模型必填');
+  if (!token) throw new Error('Admin Token 必填');
+
+  await api('/api/v1/admin/router/default-model', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-token': token,
+    },
+    body: JSON.stringify({ model }),
+  });
+
+  toast('全局模型已更新');
+  await loadInstances();
+}
+
+async function loadRouterModels() {
+  const provider = document.getElementById('fProviderGlobal')?.value || 'router';
+  if (provider !== 'router') return;
+
+  const data = await api('/api/v1/public/router/models');
+  const ids = extractModelIds(data.models || data);
+  state.modelCatalog.router = ids.length ? ids : ['gpt-5.3-codex'];
+  applyModelFilters();
+}
+
+async function logout() {
+  await api('/api/v1/public/auth/logout', { method: 'POST' });
+  toast('已退出登录');
+  await bootstrap();
+}
+
+function bindEvents() {
+  document.getElementById('btnLogin').onclick = async () => {
+    try {
+      await walletLogin();
+      await bootstrap();
+    } catch (e) {
+      toast(`登录失败: ${e.message}`, 3000);
+    }
+  };
+
+  document.getElementById('btnLogout').onclick = async () => {
+    try { await logout(); } catch (e) { toast(e.message); }
+  };
+
+  document.getElementById('btnCopyWallet').onclick = async () => {
+    if (!state.me?.wallet_id) return;
+    try {
+      await navigator.clipboard.writeText(state.me.wallet_id);
+      toast('地址已复制');
+    } catch (_) {
+      toast('复制失败');
+    }
+  };
+
+  document.getElementById('btnCreate').onclick = async () => {
+    try { await createInstance(); }
+    catch (e) { toast(`创建失败: ${e.message}`, 3000); }
+  };
+
+  document.getElementById('fKind').onchange = () => syncTemplateByKind(true);
+  syncTemplateByKind(true);
+
+  document.getElementById('btnRefresh').onclick = async () => {
+    try { await loadInstances(); }
+    catch (e) { toast(`刷新失败: ${e.message}`); }
+  };
+
+  document.getElementById('btnSetGlobalModel').onclick = async () => {
+    try { await setGlobalModel(); }
+    catch (e) { toast(`更新失败: ${e.message}`); }
+  };
+
+  document.getElementById('btnLoadModels').onclick = async () => {
+    try { await loadRouterModels(); toast('模型列表已刷新'); }
+    catch (e) { toast(`读取失败: ${e.message}`); }
+  };
+
+  document.getElementById('fProviderCreate').onchange = () => loadRouterModels().catch(() => {});
+  document.getElementById('fProviderGlobal').onchange = () => loadRouterModels().catch(() => {});
+  document.getElementById('fSupplierCreate').onchange = () => applyModelFilters();
+  document.getElementById('fSupplierGlobal').onchange = () => applyModelFilters();
+}
+
+async function bootstrap() {
+  renderWalletHistory();
+  const loggedIn = await checkAuth();
+  if (!loggedIn) return;
+
+  await Promise.allSettled([loadInstances(), loadRouterModels()]);
+
+  if (state.refreshTimer) clearInterval(state.refreshTimer);
+  state.refreshTimer = setInterval(() => {
+    loadInstances().catch(() => {});
+  }, 12000);
+
+  if (state.authTimer) clearInterval(state.authTimer);
+  state.authTimer = setInterval(async () => {
+    const ok = await checkAuth();
+    if (!ok) {
+      clearInterval(state.refreshTimer);
+      clearInterval(state.authTimer);
+      toast('登录已失效，请重新连接钱包');
+    }
+  }, 30000);
+}
+
+bindEvents();
+bootstrap();
+</script>
+</body>
+</html>

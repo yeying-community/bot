@@ -13,10 +13,12 @@ import {
   workspaceRootFromTool
 } from "./lib/common.mjs";
 
+// 统一从工具脚本位置回溯到运行 workspace 根目录。
 function workspaceRoot() {
   return workspaceRootFromTool(import.meta.url);
 }
 
+// 每个会话的待执行动作都落成一个 JSON 文件，便于 hook 和工具共享状态。
 function stateDir() {
   const dir = path.join(workspaceRoot(), "state", "pending-actions");
   fs.mkdirSync(dir, { recursive: true });
@@ -24,6 +26,7 @@ function stateDir() {
 }
 
 function inferScopeAndRequester() {
+  // 当工具运行在 openclaw 会话内时，优先从最近会话记录反推当前聊天上下文。
   const inferred = inferConversationContextFromLatestSession();
   if (!inferred) {
     return null;
@@ -49,6 +52,7 @@ function inferScopeAndRequester() {
 }
 
 function currentScopeFromArgsOrEnv(args) {
+  // 显式参数优先，其次读 hook 注入的环境变量，最后才回退到会话推断。
   const explicit = {
     channelId: args.channelId || process.env.PENDING_SCOPE_CHANNEL_ID || "feishu",
     accountId: args.accountId || process.env.PENDING_SCOPE_ACCOUNT_ID || "default",
@@ -71,6 +75,7 @@ function currentScopeFromArgsOrEnv(args) {
 }
 
 function currentRequester(args) {
+  // 请求人信息只用于权限控制和提示，因此允许缺失。
   if (args.requesterId || args.requesterLabel) {
     return {
       id: args.requesterId || null,
@@ -87,6 +92,7 @@ function currentRequester(args) {
 }
 
 function scopeFilePath(scope) {
+  // 用 base64url 编码 scope，避免 chat id 里的特殊字符污染文件名。
   const key = `${scope.channelId}:${scope.accountId}:${scope.conversationId}`;
   return path.join(stateDir(), `${base64UrlEncode(key)}.json`);
 }
@@ -115,6 +121,7 @@ function clearPending(scope) {
 
 function buildExecCommand(kind, params) {
   const toolsDir = path.join(workspaceRoot(), "tools");
+  // 待确认动作和实际执行脚本之间用 kind 做一层稳定映射。
   const toolByKind = {
     github_issue_create: "github_issue_create.mjs",
     github_issue_close: "github_issue_close.mjs"
@@ -130,6 +137,7 @@ function buildExecCommand(kind, params) {
     if (value === undefined || value === null || value === "") {
       continue;
     }
+    // 数组参数回写为逗号分隔字符串，和 parseCsv 的输入约定保持一致。
     const normalizedValue = Array.isArray(value) ? value.join(",") : String(value);
     command.push(`--${key}`, normalizedValue);
   }
@@ -143,6 +151,7 @@ function main() {
   const scope = currentScopeFromArgsOrEnv(args);
 
   if (action === "create") {
+    // create 只把预览信息和执行参数持久化，不产生外部副作用。
     const kind = required("kind", args.kind);
     const headline = required("headline", args.headline);
     const paramsJson = required("paramsJson", args.paramsJson);
@@ -170,6 +179,7 @@ function main() {
   }
 
   if (action === "get") {
+    // 未找到待执行动作时返回非零退出码，方便 hook 直接短路。
     const pending = readPending(scope);
     printJson({
       ok: Boolean(pending),
@@ -217,6 +227,7 @@ function main() {
     }
 
     if (result.status === 0 && parsed?.ok) {
+      // 只有真正执行成功才删除 pending，失败时保留给用户重试或取消。
       clearPending(scope);
       printJson({
         ok: true,
@@ -237,6 +248,7 @@ function main() {
   }
 
   if (action === "list") {
+    // list 主要给排障或后台巡检使用，直接枚举整个目录。
     const entries = fs
       .readdirSync(stateDir())
       .filter((name) => name.endsWith(".json"))
