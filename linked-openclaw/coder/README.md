@@ -40,18 +40,6 @@ sudo systemctl restart openclaw-gateway coder-bot
 sudo systemctl status --no-pager coder-bot
 ```
 
-如果你是从旧的单文件版本升级，必须确认 `coder-bot.service` 已经切到新入口：
-
-```bash
-uv run --frozen gunicorn -c config/gunicorn.conf.py src.main:APP
-```
-
-不应该再看到旧入口：
-
-```bash
-issue_bot_service:APP
-```
-
 详细说明见：
 
 - [部署手册](docs/部署手册.md)
