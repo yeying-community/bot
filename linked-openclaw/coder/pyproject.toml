@@ -1,7 +1,7 @@
 [project]
-name = "coding-bot"
+name = "coder-bot"
 version = "0.1.0"
-description = "GitHub App issue automation bot backed by local Codex"
+description = "GitHub App issue automation bot backed by local OpenClaw sessions"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -12,11 +12,12 @@ dependencies = [
 ]
 
 [project.scripts]
-coding-bot = "issue_bot_service:main"
+coder-bot = "src.main:main"
 
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-py-modules = ["issue_bot_service"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
