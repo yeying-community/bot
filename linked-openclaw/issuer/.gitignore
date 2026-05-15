@@ -1,0 +1,8 @@
+.codex
+config/github-app.config.env
+config/openclaw.json
+config/openclaw.json.bak
+config/openclaw.json.last-good
+config/policy.json
+data/
+secrets/

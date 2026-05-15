@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+USER_HOME="${HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}"
+
+DEFAULT_CONFIG="${APP_DIR}/config/openclaw.json"
+DEFAULT_STATE_DIR="${APP_DIR}/data/openclaw/state"
+GLOBAL_INSTALLS_PATH="${USER_HOME}/.openclaw/plugins/installs.json"
+
+export OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${DEFAULT_CONFIG}}"
+export OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-${DEFAULT_STATE_DIR}}"
+export PATH="${USER_HOME}/.npm-global/bin:${USER_HOME}/.local/bin:${PATH}"
+export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${APP_DIR}/data/openclaw/npm-cache}"
+export npm_config_cache="${NPM_CONFIG_CACHE}"
+
+mkdir -p "${OPENCLAW_STATE_DIR}/plugins" "${NPM_CONFIG_CACHE}"
+
+python3 - "${OPENCLAW_STATE_DIR}" "${GLOBAL_INSTALLS_PATH}" <<'PY'
+import sys
+from pathlib import Path
+
+state_dir = Path(sys.argv[1])
+global_installs_path = Path(sys.argv[2])
+installs_path = state_dir / "plugins" / "installs.json"
+
+# issuer 复用同一台机器上已经装好的全局 OpenClaw 插件，
+# 但每个实例仍需要在自己的 state 下落一份安装索引。
+if not installs_path.exists() and global_installs_path.exists():
+    installs_path.write_text(global_installs_path.read_text(encoding="utf-8"), encoding="utf-8")
+PY
+
+OPENCLAW_REAL_BIN="${OPENCLAW_REAL_BIN:-$(command -v openclaw || true)}"
+if [[ -z "${OPENCLAW_REAL_BIN}" ]]; then
+  OPENCLAW_REAL_BIN="${USER_HOME}/.npm-global/bin/openclaw"
+fi
+
+exec "${OPENCLAW_REAL_BIN}" "$@"
